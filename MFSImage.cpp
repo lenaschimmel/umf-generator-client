@@ -82,11 +82,13 @@ void MFSImage::initImage(string img)
 {	
 	goalImage = vector<Scalar>(width * height, Scalar(0,0,0));
 	goalMask = vector<bool>(width * height, false);
-	
+	#ifdef SERVER
 	vector<char> imageData(img.begin(), img.end());
 	Mat original = imdecode(Mat(imageData), CV_LOAD_IMAGE_COLOR);
-	//imshow("xx", original);
-	//waitKey();
+	#else
+	Mat original = imread(img);
+	#endif
+
 	//cout << colors.size() << endl;
 	//cout << original.cols << " " << original.rows << endl;
 	double ratio = 1.0 * width / height;
@@ -147,6 +149,10 @@ void MFSImage::initImage(string img)
 			}
 		}
 	}
+
+	//Mat goal = Mat(width, height, CV_8UC3, &(goalImage[0]));
+	//imshow("goal", goal);
+	//waitKey();
 }
 
 void MFSImage::initSimilarityCheck(const char* s)
@@ -369,7 +375,7 @@ void MFSImage::show()
 	
 	for (unsigned long i = 0; i < goalImage.size(); i++)
 	{
-		rectangle(image, Rect((i % width) * MARKERFIELD_DEF_SQUARE_PIXELS, (i / width) * MARKERFIELD_DEF_SQUARE_PIXELS, MARKERFIELD_DEF_SQUARE_PIXELS, MARKERFIELD_DEF_SQUARE_PIXELS), bluredImage[i], CV_FILLED);
+		rectangle(image, Rect((i % width) * MARKERFIELD_DEF_SQUARE_PIXELS, (i / width) * MARKERFIELD_DEF_SQUARE_PIXELS, MARKERFIELD_DEF_SQUARE_PIXELS, MARKERFIELD_DEF_SQUARE_PIXELS), goalImage[i], CV_FILLED);
 	}
 	
 	imshow("Goal image", image);

@@ -291,6 +291,29 @@ void MFSquare::show()
 	}
 }
 
+void MFSquare::output()
+{
+	Mat image = Mat::zeros(height * MARKERFIELD_DEF_SQUARE_PIXELS, width * MARKERFIELD_DEF_SQUARE_PIXELS + MARKERFIELD_DEF_SQUARE_PIXELS, CV_8UC3);
+    
+	for (unsigned int y = 0; y < height; y++)
+	{
+		for (unsigned int x = 0; x < width; x++)
+		{
+			rectangle(image, Rect(x * MARKERFIELD_DEF_SQUARE_PIXELS, y * MARKERFIELD_DEF_SQUARE_PIXELS, MARKERFIELD_DEF_SQUARE_PIXELS, MARKERFIELD_DEF_SQUARE_PIXELS), getRGBValue(dataField[y*width + x]), CV_FILLED);
+		}
+	}
+	
+	vector<int> compression_params;
+    compression_params.push_back(IMWRITE_PNG_COMPRESSION);
+    compression_params.push_back(9);
+    try {
+        imwrite("data/out.png", image, compression_params);
+    }
+    catch (cv::Exception& ex) {
+        fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
+    }
+}
+
 // @TODO review mutate
 /*void MFSquare::mutate()
 {

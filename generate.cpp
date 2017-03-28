@@ -172,7 +172,7 @@ void printMarkerInfo(markerInfo m)
 			cout << "hexa";
 			break;
 		default:
-			cout << "unknowen";
+			cout << "unknown";
 			break;
 	}
 	cout << endl;
@@ -512,11 +512,7 @@ int main (int argc, char **argv)
 	{
 		field->printStatistics();
 	}	
-	if (show_flag)
-	{
-		field->show();
-		//getc(stdin);
-	}
+
 	while ((double)(clock() - tStart)/CLOCKS_PER_SEC + 2 * oneRunTme < timeout)
 	{
 		if (debug_flag)
@@ -664,8 +660,19 @@ int main (int argc, char **argv)
 		}
 	}
 	#else
-		cout << "\n" << field->getReadableData() << "\n";
+		ofstream file = ofstream("data/out.csv");
+		file << field->getWidth() << "\n";
+		file << field->getHeight() << "\n";
+		file << field->getRangeFromType(field->getType()) << "\n";
+		file << field->getType() << "\n";
+		file << field->getWritableData() << "\n";
+		file.close();
+		field->output();
 	#endif
+
+	if(show_flag) {
+		waitKey();
+	}
 
 	delete field;
 	return 0;

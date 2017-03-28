@@ -63,6 +63,8 @@ class MFSquare: public MarkerField
 
 		// @TODO review mutate and show
 		//void mutate();
+
+		virtual void output() override;
 };
 
 #endif  //__MARKERFIELD_SQUARE_H_INCLUDED__

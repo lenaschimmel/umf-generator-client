@@ -320,11 +320,18 @@ class MarkerField
 		 * Returns a readable data
 		 */
 		virtual string getReadableData();
+		 
+		/**
+		 * Returns a writable data
+		 */
+		virtual string getWritableData();
 		
 		/**
 		 * Prints out some information
 		 */
 		void printStatistics(bool brief = false);
+
+		virtual void output();
 };
 
 #endif  // __MARKERFIELD_H_INCLUDED__

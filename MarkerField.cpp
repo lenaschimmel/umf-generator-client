@@ -703,6 +703,23 @@ string MarkerField::getReadableData()
 	return ret;
 }
 
+
+string MarkerField::getWritableData()
+{
+	string ret = "";
+	
+	for (unsigned long i = 0; i < width*height; i++)
+	{
+		ret += (unsigned char) getTextValue(dataField[i]);
+		if((i+1) % width == 0)
+			ret += (unsigned char)'\n';
+		else
+			ret += (unsigned char)';';
+	}
+	
+	return ret;
+}
+
 void MarkerField::printStatistics(bool brief)
 {
 	if (brief)
@@ -726,4 +743,9 @@ void MarkerField::printStatistics(bool brief)
 			cout << "No changes in conflict count since: " << noConflictChanges << endl;
 		}
 	}
+}
+
+void MarkerField::output()
+{
+	boost::throw_exception(MarkerFieldException("Can't outpur a non-Square markerfield!"));
 }
