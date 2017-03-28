@@ -663,6 +663,8 @@ int main (int argc, char **argv)
 			return 1;
 		}
 	}
+	#else
+		cout << "\n" << field->getReadableData() << "\n";
 	#endif
 
 	delete field;
