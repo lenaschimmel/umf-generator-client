@@ -1,4 +1,3 @@
-
 #define SERVER_URL "localhost"
 #define GETMAP_PATH "/pmgen/getmap.php?v=2"
 #define POSTMAP_PATH "/pmgen/postmap.php"
@@ -12,5 +11,3 @@
 
 #define TRUE 1
 #define FALSE 0
-
-int download(const char *server, const char *path, std::string &data);

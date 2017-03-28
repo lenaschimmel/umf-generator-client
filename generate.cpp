@@ -3,7 +3,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <getopt.h>
+
 #include "generate.h"
+
 #include "MFSGrayscale.h"
 #include "MFHGrayscale.h"
 #include "MFSColor.h"
@@ -12,13 +14,16 @@
 
 #include <istream>
 #include <ostream>
-#include <boost/asio.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
+#ifdef SERVER
+#include "network.h"
 using boost::asio::ip::tcp;
+#endif
+
 using namespace std;
 
 int experiment_flag = FALSE;
@@ -122,7 +127,11 @@ MarkerField *getMarkerField(markerInfo m)
 			if (m.img_id > 0)
 			{
 				string imageString;
-				download(m.img_server.c_str(), m.img_path.c_str(), imageString);
+				#ifdef SERVER
+					download(m.img_server.c_str(), m.img_path.c_str(), imageString);
+				#else
+					imageString = m.img_path;
+				#endif
 				
 				return new MFSImage(m.width, m.height, m.kernel, m.kernel_type, m.type, m.threshold_equal, m.cost_neighbors.c_str(), m.cost_similarity, m.colors.c_str(), m.img_alg.c_str(), m.data, imageString, m.img_conv.c_str());
 			}
@@ -143,34 +152,6 @@ MarkerField *getMarkerField(markerInfo m)
 		}
 	}
 }
-
-/**
- * Very light weight URL safe converter
- */
- string makeURLSafe(string s)
- {
-	 string r = "";
-	 for (unsigned int i = 0; i < s.size(); i++)
-	 {
-		switch (s[i]) {
-			case '#':
-				r += "%23";
-				break;
-			case ',':
-				r += "%2C";
-				break;
-			case ':':
-				r += "%3A";
-				break;
-			case ';':
-				r += "%3B";
-				break;
-			default:
-				r += s[i];
-		}
-	 }
-	 return r;
- }
 
 
 /**
@@ -227,115 +208,6 @@ void printMarkerInfo(markerInfo m)
 	cout << "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
 }
 
-/**
- * DOWNLOAD
- */
-int download(const char *server, const char *path, string &data)
-{
-	try
-	{
-		boost::asio::io_service io_service;
-
-		// Get a list of endpoints corresponding to the server name.
-		tcp::resolver resolver(io_service);
-		tcp::resolver::query query(server, "http");
-		tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
-		tcp::resolver::iterator end;
-
-		// Try each endpoint until we successfully establish a connection.
-		tcp::socket socket(io_service);
-		boost::system::error_code error = boost::asio::error::host_not_found;
-		while (error && endpoint_iterator != end)
-		{
-			socket.close();
-			socket.connect(*endpoint_iterator++, error);
-		}
-		if (error)
-		{
-			throw boost::system::system_error(error);
-		}
-
-		// Form the request. We specify the "Connection: close" header so that the
-		// server will close the socket after transmitting the response. This will
-		// allow us to treat all data up until the EOF as the content.
-		boost::asio::streambuf request;
-		ostream request_stream(&request);
-		request_stream << "GET " << path << " HTTP/1.0\r\n";
-		request_stream << "Host: " << server << "\r\n";
-		request_stream << "Accept: */*\r\n";
-		request_stream << "Connection: close\r\n\r\n";
-
-		// Send the request.
-		boost::asio::write(socket, request);
-
-		// Read the response status line.
-		boost::asio::streambuf response;
-		boost::asio::read_until(socket, response, "\r\n");
-
-		// Check that response is OK.
-		istream response_stream(&response);
-		string http_version;
-		response_stream >> http_version;
-		unsigned int status_code;
-		response_stream >> status_code;
-		string status_message;
-		getline(response_stream, status_message);
-		if (!response_stream || http_version.substr(0, 5) != "HTTP/")
-		{
-			cerr << "Invalid response\n";
-			return 1;
-		}
-		if (status_code != 200)
-		{
-			cerr << "Download: Response returned with status code " << status_code << "\n";
-			return 1;
-		}
-
-		// Read the response headers, which are terminated by a blank line.
-		boost::asio::read_until(socket, response, "\r\n\r\n");
-
-		// Process the response headers.
-		string header;
-		while (getline(response_stream, header) && header != "\r")
-		{
-			//cout << header << "\n";
-		}
-		//cout << "\n";
-		
-		
-		ostringstream xmlStream;
-
-		// Write whatever content we already have to output.
-		if (response.size() > 0)
-		{
-			//cout << &response;
-			xmlStream << &response;
-		}
-
-		// Read until EOF, writing data to output as we go.
-		while (boost::asio::read(socket, response, boost::asio::transfer_at_least(1), error))
-		{
-			xmlStream << &response;
-		}
-		if (error != boost::asio::error::eof)
-		{
-			throw boost::system::system_error(error);
-		}
-		
-		data = xmlStream.str();
-	
-		//if (xmlString.length() > 0) {
-		//	cout << xmlString << endl;
-		//}
-			
-		return 0;
-	}
-	catch (exception& e)
-	{
-		cerr << "Exception: " << e.what() << "\n";
-		return 1;
-	}
-}
 
 /**
  * MAIN LOOP
@@ -346,10 +218,11 @@ int main (int argc, char **argv)
 	 * Initialization
 	 */
 	string xmlString = "";
+	string xmlPathString = "";
 	clock_t tStart = clock();
 	
-		using boost::property_tree::ptree;
-		ptree pt;
+	using boost::property_tree::ptree;
+	ptree pt;
 	
 	// default values...
 	unsigned int timeout = DEFAULT_TIMEOUT_SECONDS;
@@ -359,9 +232,11 @@ int main (int argc, char **argv)
 	int send_flag = TRUE;
 	//char image_server[1024];
 	//char image_path[1024];
+	#ifdef SERVER
 	char server_url[1024] = SERVER_URL;
 	char get_path[1024] = GETMAP_PATH;
 	char post_path[1024] = POSTMAP_PATH;
+	#endif
 	int c;
 
 	/* READING ARGUMENTS*/
@@ -369,19 +244,20 @@ int main (int argc, char **argv)
 	{
 		static struct option long_options[] =
 		{
-			// These options set a flag.
 			{"debug", no_argument,       &debug_flag, TRUE},
 			{"show", no_argument,       &show_flag, TRUE},
-			{"not-send", no_argument,       &send_flag, FALSE},
 			{"experiment", no_argument,       &experiment_flag, TRUE},
-			// These options don't set a flag.
 			{"help", no_argument,       0, 'h'},
+			{"xml", required_argument, 0, 'x'},
+			#ifdef SERVER
+			{"not-send", no_argument,       &send_flag, FALSE},
 			{"server-url", required_argument,       0, 's'},
 			{"get-path", required_argument,       0, 'g'},
 			{"post-path", required_argument,       0, 'p'},
-			{"xxx", required_argument, 0, 'x'},
+			{"xxx", required_argument, 0, 'p'},
 			//{"image-server",     required_argument,       0, 's'},
 			//{"image-path",  required_argument,       0, 'p'},
+			#endif
 			{0, 0, 0, 0}
 		};
 		
@@ -404,7 +280,11 @@ int main (int argc, char **argv)
 					printf (" with arg %s", optarg);
 				printf ("\n");
 				break;
-				
+			case 'x':
+				xmlPathString = string(optarg);
+				break;
+
+			#ifdef SERVER
 			case 's':
 				strcpy(server_url, optarg);
 				break;
@@ -416,10 +296,11 @@ int main (int argc, char **argv)
 			case 'p':
 				strcpy(post_path, optarg);
 				break;
-				
-			case 'x':
+
+			case 'p':
 				strcpy(tmp_xxx, optarg);
 				break;
+			#endif
 
 			//case 's':
 			//	strcpy(image_server, optarg);
@@ -457,30 +338,40 @@ int main (int argc, char **argv)
 		cout << "  options:" << endl;
 		cout << "    --debug              print info about the process" << endl;
 		cout << "    --show               visualisation of the results" << endl;
-		cout << "    --not-send           if flag is set the result is not sent back to the server" << endl;
 		cout << "    --experiment         experimental flag" << endl;
 		cout << "    --help               prints help" << endl;
+		#ifdef SERVER
+		cout << "    --not-send           if flag is set the result is not sent back to the server" << endl;
 		cout << "    --server-url=<url>   you can set the server to use" << endl;
 		cout << "    --get-path=<path>    path on the server, where the map is received" << endl;
 		cout << "    --post-path=<path>   path on the server, where the result is posted" << endl;
+		#else
+		cout << "    --xml=<path>         local path to an XML definition of the marker" << endl;
+		#endif
 		cout << endl;
 		return 0;
 	}
 	
+	#ifdef SERVER
 	// experiment URL
 	if (experiment_flag)
 	{
 		strcat(get_path, EXPERIMENT_FLAG);
 	}
+	#endif
 	
 	/* TRYING TO GET A USABLE MAP */
 	try
 	{
 		do
 		{
-			download(server_url, get_path, xmlString);
+			#ifdef SERVER
+				download(server_url, get_path, xmlString);
+				istringstream xmlIStream(xmlString);
+			#else
+				ifstream xmlIStream(xmlPathString);
+			#endif
 			
-			istringstream xmlIStream(xmlString);
 			
 			// populate tree structure pt
 			read_xml(xmlIStream, pt);
@@ -585,7 +476,7 @@ int main (int argc, char **argv)
         }
     }
 	
-	string post_data = "";
+	
 	
 	if (debug_flag)
 	{
@@ -645,6 +536,9 @@ int main (int argc, char **argv)
 			field->show();
 		}
 	}
+
+	#if SERVER
+	string post_data = "";
 	//			post_data += gray.getData();
 			
 	//			cost = gray.getCost();
@@ -769,7 +663,8 @@ int main (int argc, char **argv)
 			return 1;
 		}
 	}
-	
+	#endif
+
 	delete field;
 	return 0;
 }
