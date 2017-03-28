@@ -221,7 +221,7 @@ class MarkerField
 	
 	public:
 		
-		~MarkerField();
+		virtual ~MarkerField();
 	
 		/***************************************************************
 		 * GETTER METHODS FOR STANDARD ATTRIBUTES

@@ -18,11 +18,11 @@ MarkerField::MarkerField(unsigned int w, unsigned int h, unsigned int k, unsigne
 
 MarkerField::~MarkerField()
 {
-	if (dataField == NULL)
+	if (dataField != NULL)
 	{
 		free(dataField);
 	}
-	if (costField == NULL)
+	if (costField != NULL)
 	{
 		free(costField);
 	}
